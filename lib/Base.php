@@ -129,10 +129,7 @@ class Base {
   public function receive() {
     if (!$this->is_connected) $this->connect(); /// @todo This is a client function, fixme!
 
-    $this->huge_payload = '';
-
-    $response = null;
-    while (is_null($response)) $response = $this->receive_fragment();
+    $response = $this->receive_fragment();
 
     return $response;
   }
@@ -141,6 +138,9 @@ class Base {
 
     // Just read the main fragment information first.
     $data = $this->read(2);
+	if ($data === '') {
+		return '';
+	}
 
     // Is this the final fragment?  // Bit 0 in byte 0
     /// @todo Handle huge payloads with multiple fragments.
@@ -253,6 +253,8 @@ class Base {
   }
 
   protected function read($length) {
+  	stream_set_blocking($this->socket, false);
+
     $data = '';
     while (strlen($data) < $length) {
       $buffer = fread($this->socket, $length - strlen($data));
@@ -264,11 +266,8 @@ class Base {
           . json_encode($metadata)
         );
       }
-      if ($buffer === '') {
-        $metadata = stream_get_meta_data($this->socket);
-        throw new ConnectionException(
-          'Empty read; connection dead?  Stream state: ' . json_encode($metadata)
-        );
+      if ($buffer === '') {  // No more messages or connection issue; @TODO Solve the connection issue; When you e.g. turn off (then on) wifi, you will always get empty `$msg`. We need to detect it somehow. For instance if empty `$msg` are for longer than 5s try to reconnect. Or maybe there is native way of detecting the issue.
+      	return $buffer;
       }
       $data .= $buffer;
     }
