@@ -137,7 +137,7 @@ class Base {
   protected function receive_fragment() {
 
     // Just read the main fragment information first.
-    $data = $this->read(2);
+    $data = $this->read(2, true);
 	if ($data === '') {
 		return '';
 	}
@@ -252,8 +252,10 @@ class Base {
     }
   }
 
-  protected function read($length) {
+  protected function read($length, $isCheckingNewMessages = false) {
   	stream_set_blocking($this->socket, false);
+
+  	$lastNotEmptyRead = time();
 
     $data = '';
     while (strlen($data) < $length) {
@@ -266,9 +268,20 @@ class Base {
           . json_encode($metadata)
         );
       }
-      if ($buffer === '') {  // No more messages or connection issue; @TODO Solve the connection issue; When you e.g. turn off (then on) wifi, you will always get empty `$msg`. We need to detect it somehow. For instance if empty `$msg` are for longer than 5s try to reconnect. Or maybe there is native way of detecting the issue.
-      	return $buffer;
-      }
+      if ($isCheckingNewMessages) {
+      		if ($buffer === '') { // No more messages or connection issue;
+				return '';
+			}
+	  } else {
+		  if ($buffer === '') {  // No more messages or connection issue;
+		  	if (time() - $lastNotEmptyRead > $this->options['timeout']) {
+		  		throw new ConnectionException("Read timeout"); // This is to recover from endless loop when connection issue happens.
+			}
+		  } else {
+			  $lastNotEmptyRead = time();
+		  }
+	  }
+
       $data .= $buffer;
     }
     return $data;
