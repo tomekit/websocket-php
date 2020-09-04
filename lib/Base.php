@@ -252,7 +252,7 @@ class Base {
     }
   }
 
-  protected function read($length, $isCheckingNewMessages = false) {
+  public function read($length, $isCheckingNewMessages = false) {
   	stream_set_blocking($this->socket, false);
 
   	$lastNotEmptyRead = time();
